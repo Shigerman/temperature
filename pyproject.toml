@@ -8,6 +8,10 @@ authors = ["Larisa Shigareva <thelarisa81@gmail.com>"]
 python = "^3.9"
 Flask = "^1.1.2"
 celery = "^5.0.5"
+python-dotenv = "^0.17.1"
+requests = "^2.25.1"
+redis = "^3.5.3"
+icecream = "^2.1.0"
 
 [tool.poetry.dev-dependencies]
 

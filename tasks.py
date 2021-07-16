@@ -1,4 +1,5 @@
 from celery import Celery
+from dateutil import tz
 import datetime
 from dotenv import load_dotenv
 import os
@@ -18,29 +19,32 @@ def kelvin_to_celsius(number):
 
 
 @app.task
-def periodic_temperature_to_db():
+def periodic_temperature_to_sqlite():
     """
-    Task runs every minute and gets the temperature value for Moscow.
-    Value is written into db.
-
+    Task gets the temperature value for Moscow and writes it into SQLIte
     """
     ENDPOINT = "http://api.openweathermap.org/data/2.5/weather"
     URL = f"{ENDPOINT}?q={CITY}&APPID={TEMP_API_KEY}"
+
     weather_json = requests.get(URL).json()
     temperature_in_kelvin = weather_json.get("main", {}).get("temp", None)
 
     if not temperature_in_kelvin:
         return
     temperature_in_celsius = kelvin_to_celsius(temperature_in_kelvin)
-    query = f"INSERT INTO temp(temp) VALUES ({temperature_in_celsius})"
 
+    Moscow_tz = tz.gettz("Europe/Moscow")
+    now = datetime.datetime.now(tz=Moscow_tz)
+
+    query = f"INSERT INTO temp(date, temp) VALUES (?, ?)"
     conn = sqlite3.connect('sqlite.db')
     cursor = conn.cursor()
-    cursor.execute(query)
+    cursor.execute(query, (now, temperature_in_celsius))
     conn.commit()
     cursor.close()
 
-periodic_temperature_to_db()
+
+periodic_temperature_to_sqlite()
 
 
 @app.task
@@ -60,27 +64,36 @@ def calculate_max_temperature():
 
     query = f'SELECT temp FROM temp WHERE date like "%{yesterday_str}%"'
     cursor.execute(query)
-    temps = cursor.fetchall()
+    yesterday_temps = cursor.fetchall()
 
-    max_temp = max([temp[0] for temp in temps])
-    conn.commit()
-    cursor.close()
-    return (yesterday_str, max_temp)
+    if len(yesterday_temps) > 0:
+        max_temp = max([db_row[0] for db_row in yesterday_temps])
+        conn.commit()
+        cursor.close()
+        return (yesterday_str, max_temp)
+    return
 
 
 yesterday, max_temp = calculate_max_temperature()
 
 
 @app.task
-def save_max_temperature(yesterday, max_temp):
+def save_max_temperature_to_sqlite(yesterday, max_temp):
     """
     Save the highest temperature for the previous day to the database.
     """
     conn = sqlite3.connect('sqlite.db')
     cursor = conn.cursor()
-    query = f"INSERT INTO history(date, temp) VALUES({yesterday}, {max_temp})"
-    cursor.execute(query)
-    conn.commit()
-    cursor.close()
 
-save_max_temperature(yesterday, max_temp)
+    query = f'SELECT date FROM history WHERE date like "%{yesterday}%"'
+    cursor.execute(query)
+    yesterday_temps = cursor.fetchall()
+
+    if len(yesterday_temps) == 0:
+        query = f"INSERT INTO history(date, temp) VALUES (?, ?)"
+        cursor.execute(query, (yesterday, max_temp))
+        conn.commit()
+        cursor.close()
+
+
+save_max_temperature_to_sqlite(yesterday, max_temp)

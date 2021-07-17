@@ -74,9 +74,6 @@ def calculate_max_temperature():
     return
 
 
-yesterday, max_temp = calculate_max_temperature()
-
-
 @app.task
 def save_max_temperature_to_sqlite(yesterday, max_temp):
     """
@@ -85,15 +82,19 @@ def save_max_temperature_to_sqlite(yesterday, max_temp):
     conn = sqlite3.connect('sqlite.db')
     cursor = conn.cursor()
 
-    query = f'SELECT date FROM history WHERE date like "%{yesterday}%"'
-    cursor.execute(query)
+    query_select = f'SELECT date FROM history WHERE date like "%{yesterday}%"'
+    cursor.execute(query_select)
     yesterday_temps = cursor.fetchall()
 
     if len(yesterday_temps) == 0:
-        query = f"INSERT INTO history(date, temp) VALUES (?, ?)"
-        cursor.execute(query, (yesterday, max_temp))
+        query_insert = f"INSERT INTO history(date, temp) VALUES (?, ?)"
+        cursor.execute(query_insert, (yesterday, max_temp))
+        query_delete = f'DELETE FROM temp WHERE date like "%{yesterday}%"'
+        cursor.execute(query_delete)
         conn.commit()
         cursor.close()
 
 
-save_max_temperature_to_sqlite(yesterday, max_temp)
+if calculate_max_temperature():
+    yesterday, max_temp = calculate_max_temperature()
+    save_max_temperature_to_sqlite(yesterday, max_temp)

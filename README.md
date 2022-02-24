@@ -21,8 +21,11 @@ Flask app showing statistics on air temperature in Moscow
 ```
 python3 -m pip install poetry
 poetry install
-poetry run app.py
+poetry run python app.py
 ```
+
+run redis-server: run "redis-server" command in the command line.
+start worker: celery -A tasks worker --loglevel=INFO
 
 ### filling the database
 

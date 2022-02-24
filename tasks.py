@@ -11,7 +11,11 @@ load_dotenv()
 TEMP_API_KEY = os.environ['TEMP_API_KEY']
 CITY = os.environ['CITY']
 
-app = Celery('tasks', broker='redis://localhost')
+app = Celery('tasks', backend='redis://localhost', broker='pyamqp://')
+
+
+app.conf.broker_url = 'redis://localhost:6379/0'
+app.conf.result_backend = 'redis://localhost:6379/0'
 
 
 def kelvin_to_celsius(number):
@@ -98,3 +102,5 @@ def save_max_temperature_to_sqlite(yesterday, max_temp):
 if calculate_max_temperature():
     yesterday, max_temp = calculate_max_temperature()
     save_max_temperature_to_sqlite(yesterday, max_temp)
+
+print("debug")
